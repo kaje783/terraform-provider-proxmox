@@ -30,9 +30,9 @@ func TestResourceVirtualEnvironmentVMSchema(t *testing.T) {
 	testOptionalArguments(t, s, []string{
 		mkResourceVirtualEnvironmentVMACPI,
 		mkResourceVirtualEnvironmentVMAgent,
-		mkResourceVirtualEnvironmentVMArgs,
 		mkResourceVirtualEnvironmentVMAudioDevice,
 		mkResourceVirtualEnvironmentVMBIOS,
+		mkResourceVirtualEnvironmentVMBootArgument,
 		mkResourceVirtualEnvironmentVMCDROM,
 		mkResourceVirtualEnvironmentVMClone,
 		mkResourceVirtualEnvironmentVMCPU,
@@ -64,9 +64,9 @@ func TestResourceVirtualEnvironmentVMSchema(t *testing.T) {
 	testValueTypes(t, s, map[string]schema.ValueType{
 		mkResourceVirtualEnvironmentVMACPI:                  schema.TypeBool,
 		mkResourceVirtualEnvironmentVMAgent:                 schema.TypeList,
-		mkResourceVirtualEnvironmentVMArgs:                  schema.TypeList,
 		mkResourceVirtualEnvironmentVMAudioDevice:           schema.TypeList,
 		mkResourceVirtualEnvironmentVMBIOS:                  schema.TypeString,
+		mkResourceVirtualEnvironmentVMBootArgument:          schema.TypeList,
 		mkResourceVirtualEnvironmentVMCDROM:                 schema.TypeList,
 		mkResourceVirtualEnvironmentVMCPU:                   schema.TypeList,
 		mkResourceVirtualEnvironmentVMDescription:           schema.TypeString,

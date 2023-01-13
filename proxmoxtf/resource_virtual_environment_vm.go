@@ -120,12 +120,12 @@ const (
 	mkResourceVirtualEnvironmentVMAgentTimeout                      = "timeout"
 	mkResourceVirtualEnvironmentVMAgentTrim                         = "trim"
 	mkResourceVirtualEnvironmentVMAgentType                         = "type"
-	mkResourceVirtualEnvironmentVMArgs                              = "args"
 	mkResourceVirtualEnvironmentVMAudioDevice                       = "audio_device"
 	mkResourceVirtualEnvironmentVMAudioDeviceDevice                 = "device"
 	mkResourceVirtualEnvironmentVMAudioDeviceDriver                 = "driver"
 	mkResourceVirtualEnvironmentVMAudioDeviceEnabled                = "enabled"
 	mkResourceVirtualEnvironmentVMBIOS                              = "bios"
+	mkResourceVirtualEnvironmentVMBootArgument                      = "bootargument"
 	mkResourceVirtualEnvironmentVMCDROM                             = "cdrom"
 	mkResourceVirtualEnvironmentVMCDROMEnabled                      = "enabled"
 	mkResourceVirtualEnvironmentVMCDROMFileID                       = "file_id"
@@ -296,9 +296,9 @@ func resourceVirtualEnvironmentVM() *schema.Resource {
 				MaxItems: 1,
 				MinItems: 0,
 			},
-			mkResourceVirtualEnvironmentVMArgs: {
+			mkResourceVirtualEnvironmentVMBootArgument: {
 				Type:             schema.TypeList,
-				Description:      "The Args implementation",
+				Description:      "The BootArguments implementation",
 				Optional:         true,
 				Elem:             &schema.Schema{Type: schema.TypeString},
 			},
@@ -1232,8 +1232,6 @@ func resourceVirtualEnvironmentVMCreateClone(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
-	args := d.Get(mkResourceVirtualEnvironmentVMArgs).([]interface{})
-
 	clone := d.Get(mkResourceVirtualEnvironmentVMClone).([]interface{})
 	cloneBlock := clone[0].(map[string]interface{})
 	cloneRetries := cloneBlock[mkResourceVirtualEnvironmentVMCloneRetries].(int)
@@ -1371,6 +1369,7 @@ func resourceVirtualEnvironmentVMCreateClone(ctx context.Context, d *schema.Reso
 	}
 
 	bios := d.Get(mkResourceVirtualEnvironmentVMBIOS).(string)
+	bootArguments := d.Get(mkResourceVirtualEnvironmentVMBootArgument).([]interface{})
 	cdrom := d.Get(mkResourceVirtualEnvironmentVMCDROM).([]interface{})
 	cpu := d.Get(mkResourceVirtualEnvironmentVMCPU).([]interface{})
 	initialization := d.Get(mkResourceVirtualEnvironmentVMInitialization).([]interface{})
@@ -1412,9 +1411,9 @@ func resourceVirtualEnvironmentVMCreateClone(ctx context.Context, d *schema.Reso
 		}
 	}
 
-	if len(args) > 0 {
-		argsString := resourceVirtualEnvironmentVMGetArgsString(d)
-		updateBody.Args = &argsString
+	if len(bootArguments) > 0 {
+		bootArgumentString := resourceVirtualEnvironmentVMGetBootArgumentString(d)
+		updateBody.Args = &bootArgumentString
 	}
 
 	if bios != dvResourceVirtualEnvironmentVMBIOS {
@@ -1756,7 +1755,7 @@ func resourceVirtualEnvironmentVMCreateCustom(ctx context.Context, d *schema.Res
 	agentTrim := proxmox.CustomBool(agentBlock[mkResourceVirtualEnvironmentVMAgentTrim].(bool))
 	agentType := agentBlock[mkResourceVirtualEnvironmentVMAgentType].(string)
 
-	args := d.Get(mkResourceVirtualEnvironmentVMArgs).([]interface{})
+	bootArguments := d.Get(mkResourceVirtualEnvironmentVMBootArgument).([]interface{})
 
 	audioDevices, err := resourceVirtualEnvironmentVMGetAudioDeviceList(d)
 	if err != nil {
@@ -1953,9 +1952,9 @@ func resourceVirtualEnvironmentVMCreateCustom(ctx context.Context, d *schema.Res
 		VMID:                &vmID,
 	}
 
-	if len(args) > 0 {
-		argsString := resourceVirtualEnvironmentVMGetArgsString(d)
-		createBody.Args = &argsString
+	if len(bootArguments) > 0 {
+		bootArgumentString := resourceVirtualEnvironmentVMGetBootArgumentString(d)
+		createBody.Args = &bootArgumentString
 	}
 
 	if sataDeviceObjects != nil {
@@ -2576,16 +2575,16 @@ func resourceVirtualEnvironmentVMGetSerialDeviceList(d *schema.ResourceData) (pr
 	return list, nil
 }
 
-func resourceVirtualEnvironmentVMGetArgsString(d *schema.ResourceData) string {
-	args := d.Get(mkResourceVirtualEnvironmentVMArgs).([]interface{})
-	var sanitizedArgs []string
-	for i := 0; i < len(args); i++ {
-		arg := strings.TrimSpace(args[i].(string))
-		if len(arg) > 0 {
-			sanitizedArgs = append(sanitizedArgs, arg)
+func resourceVirtualEnvironmentVMGetBootArgumentString(d *schema.ResourceData) string {
+	bootArguments := d.Get(mkResourceVirtualEnvironmentVMBootArgument).([]interface{})
+	var sanitizedBootArguments []string
+	for i := 0; i < len(bootArguments); i++ {
+		bootArgument := strings.TrimSpace(bootArguments[i].(string))
+		if len(bootArgument) > 0 {
+			sanitizedBootArguments = append(sanitizedBootArguments, bootArgument)
 		}
 	}
-	return strings.Join(sanitizedArgs, " ")
+	return strings.Join(sanitizedBootArguments, " ")
 }
 
 func resourceVirtualEnvironmentVMGetTagsString(d *schema.ResourceData) string {
@@ -2766,12 +2765,12 @@ func resourceVirtualEnvironmentVMReadCustom(ctx context.Context, d *schema.Resou
 	currentAudioDevice := d.Get(mkResourceVirtualEnvironmentVMAudioDevice).([]interface{})
 
 	// Compare the operating system configuration to the one stored in the state.
-	args := map[string]interface{}{}
+	bootArguments := map[string]interface{}{}
 
 	if vmConfig.Args != nil {
-		args[mkResourceVirtualEnvironmentVMArgs] = *vmConfig.Args
+		bootArguments[mkResourceVirtualEnvironmentVMBootArgument] = *vmConfig.Args
 	} else {
-		args[mkResourceVirtualEnvironmentVMArgs] = []string{}
+		bootArguments[mkResourceVirtualEnvironmentVMBootArgument] = []string{}
 	}
 
 
@@ -3611,19 +3610,19 @@ func resourceVirtualEnvironmentVMReadPrimitiveValues(d *schema.ResourceData, vmC
 		diags = append(diags, diag.FromErr(err)...)
 	}
 
-	currentArgs := d.Get(mkResourceVirtualEnvironmentVMArgs).([]interface{})
+	currentBootArguments := d.Get(mkResourceVirtualEnvironmentVMBootArgument).([]interface{})
 
-	if len(clone) == 0 || len(currentArgs) > 0 {
-		var args []string
+	if len(clone) == 0 || len(currentBootArguments) > 0 {
+		var bootarguments []string
 		if vmConfig.Args != nil {
-			for _, arg := range strings.Split(*vmConfig.Args, " -") {
-				t := strings.TrimSpace(arg)
+			for _, bootargument := range strings.Split(*vmConfig.Args, " -") {
+				t := strings.TrimSpace(bootargument)
 				if len(t) > 0 {
-					args = append(args, "-" + t)
+					bootarguments = append(bootarguments, "-" + t)
 				}
 			}
 		}
-		err = d.Set(mkResourceVirtualEnvironmentVMArgs, args)
+		err = d.Set(mkResourceVirtualEnvironmentVMBootArgument, bootarguments)
 		diags = append(diags, diag.FromErr(err)...)
 	}
 
@@ -3785,9 +3784,9 @@ func resourceVirtualEnvironmentVMUpdate(ctx context.Context, d *schema.ResourceD
 		rebootRequired = true
 	}
 
-	if d.HasChange(mkResourceVirtualEnvironmentVMArgs) {
-		argsString := resourceVirtualEnvironmentVMGetArgsString(d)
-		updateBody.Args = &argsString
+	if d.HasChange(mkResourceVirtualEnvironmentVMBootArgument) {
+		bootArgumentString := resourceVirtualEnvironmentVMGetBootArgumentString(d)
+		updateBody.Args = &bootArgumentString
 		rebootRequired = true
 	}
 
