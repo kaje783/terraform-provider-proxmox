@@ -300,7 +300,6 @@ func resourceVirtualEnvironmentVM() *schema.Resource {
 				Type:             schema.TypeList,
 				Description:      "The Args implementation",
 				Optional:         true,
-				//Default:          []string{""},
 				Elem:             &schema.Schema{Type: schema.TypeString},
 			},
 			mkResourceVirtualEnvironmentVMAudioDevice: {
@@ -1757,7 +1756,6 @@ func resourceVirtualEnvironmentVMCreateCustom(ctx context.Context, d *schema.Res
 	agentTrim := proxmox.CustomBool(agentBlock[mkResourceVirtualEnvironmentVMAgentTrim].(bool))
 	agentType := agentBlock[mkResourceVirtualEnvironmentVMAgentType].(string)
 
-	//args := d.Get(mkResourceVirtualEnvironmentVMArgs).(string)
 	args := d.Get(mkResourceVirtualEnvironmentVMArgs).([]interface{})
 
 	audioDevices, err := resourceVirtualEnvironmentVMGetAudioDeviceList(d)

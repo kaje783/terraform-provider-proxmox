@@ -258,7 +258,6 @@ type VirtualEnvironmentVMCreateRequestBody struct {
 	Hugepages            *string                      `json:"hugepages,omitempty" url:"hugepages,omitempty"`
 	IDEDevices           CustomStorageDevices         `json:"ide,omitempty" url:",omitempty"`
 	KeyboardLayout       *string                      `json:"keyboard,omitempty" url:"keyboard,omitempty"`
-	KVMArguments         CustomLineBreakSeparatedList `json:"args,omitempty" url:"args,omitempty,space"`
 	KVMEnabled           *CustomBool                  `json:"kvm,omitempty" url:"kvm,omitempty,int"`
 	LocalTime            *CustomBool                  `json:"localtime,omitempty" url:"localtime,omitempty,int"`
 	Lock                 *string                      `json:"lock,omitempty" url:"lock,omitempty"`
@@ -391,7 +390,6 @@ type VirtualEnvironmentVMGetResponseData struct {
 	IPConfig6            *CustomCloudInitIPConfig      `json:"ipconfig6,omitempty"`
 	IPConfig7            *CustomCloudInitIPConfig      `json:"ipconfig7,omitempty"`
 	KeyboardLayout       *string                       `json:"keyboard,omitempty"`
-	KVMArguments         *CustomLineBreakSeparatedList `json:"args,omitempty"`
 	KVMEnabled           *CustomBool                   `json:"kvm,omitempty"`
 	LocalTime            *CustomBool                   `json:"localtime,omitempty"`
 	Lock                 *string                       `json:"lock,omitempty"`
