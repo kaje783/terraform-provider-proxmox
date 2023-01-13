@@ -64,7 +64,7 @@ func TestResourceVirtualEnvironmentVMSchema(t *testing.T) {
 	testValueTypes(t, s, map[string]schema.ValueType{
 		mkResourceVirtualEnvironmentVMACPI:                  schema.TypeBool,
 		mkResourceVirtualEnvironmentVMAgent:                 schema.TypeList,
-		mkResourceVirtualEnvironmentVMArgs:                 schema.TypeString,
+		mkResourceVirtualEnvironmentVMArgs:                  schema.TypeList,
 		mkResourceVirtualEnvironmentVMAudioDevice:           schema.TypeList,
 		mkResourceVirtualEnvironmentVMBIOS:                  schema.TypeString,
 		mkResourceVirtualEnvironmentVMCDROM:                 schema.TypeList,

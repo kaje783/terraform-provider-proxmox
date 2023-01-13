@@ -30,7 +30,6 @@ const (
 	dvResourceVirtualEnvironmentVMAgentTimeout                      = "15m"
 	dvResourceVirtualEnvironmentVMAgentTrim                         = false
 	dvResourceVirtualEnvironmentVMAgentType                         = "virtio"
-	dvResourceVirtualEnvironmentVMArgs                              = ""
 	dvResourceVirtualEnvironmentVMAudioDeviceDevice                 = "intel-hda"
 	dvResourceVirtualEnvironmentVMAudioDeviceDriver                 = "spice"
 	dvResourceVirtualEnvironmentVMAudioDeviceEnabled                = true
@@ -298,10 +297,11 @@ func resourceVirtualEnvironmentVM() *schema.Resource {
 				MinItems: 0,
 			},
 			mkResourceVirtualEnvironmentVMArgs: {
-				Type:             schema.TypeString,
+				Type:             schema.TypeList,
 				Description:      "The Args implementation",
 				Optional:         true,
-				Default:          dvResourceVirtualEnvironmentVMArgs,
+				//Default:          []string{""},
+				Elem:             &schema.Schema{Type: schema.TypeString},
 			},
 			mkResourceVirtualEnvironmentVMAudioDevice: {
 				Type:        schema.TypeList,
@@ -1233,6 +1233,8 @@ func resourceVirtualEnvironmentVMCreateClone(ctx context.Context, d *schema.Reso
 		return diag.FromErr(err)
 	}
 
+	args := d.Get(mkResourceVirtualEnvironmentVMArgs).([]interface{})
+
 	clone := d.Get(mkResourceVirtualEnvironmentVMClone).([]interface{})
 	cloneBlock := clone[0].(map[string]interface{})
 	cloneRetries := cloneBlock[mkResourceVirtualEnvironmentVMCloneRetries].(int)
@@ -1364,7 +1366,6 @@ func resourceVirtualEnvironmentVMCreateClone(ctx context.Context, d *schema.Reso
 	// Now that the virtual machine has been cloned, we need to perform some modifications.
 	acpi := proxmox.CustomBool(d.Get(mkResourceVirtualEnvironmentVMACPI).(bool))
 	agent := d.Get(mkResourceVirtualEnvironmentVMAgent).([]interface{})
-	args := d.Get(mkResourceVirtualEnvironmentVMArgs).(string)
 	audioDevices, err := resourceVirtualEnvironmentVMGetAudioDeviceList(d)
 	if err != nil {
 		return diag.FromErr(err)
@@ -1412,8 +1413,9 @@ func resourceVirtualEnvironmentVMCreateClone(ctx context.Context, d *schema.Reso
 		}
 	}
 
-	if args != dvResourceVirtualEnvironmentVMArgs {
-		updateBody.Args = &args
+	if len(args) > 0 {
+		argsString := resourceVirtualEnvironmentVMGetArgsString(d)
+		updateBody.Args = &argsString
 	}
 
 	if bios != dvResourceVirtualEnvironmentVMBIOS {
@@ -1755,7 +1757,8 @@ func resourceVirtualEnvironmentVMCreateCustom(ctx context.Context, d *schema.Res
 	agentTrim := proxmox.CustomBool(agentBlock[mkResourceVirtualEnvironmentVMAgentTrim].(bool))
 	agentType := agentBlock[mkResourceVirtualEnvironmentVMAgentType].(string)
 
-	args := d.Get(mkResourceVirtualEnvironmentVMArgs).(string)
+	//args := d.Get(mkResourceVirtualEnvironmentVMArgs).(string)
+	args := d.Get(mkResourceVirtualEnvironmentVMArgs).([]interface{})
 
 	audioDevices, err := resourceVirtualEnvironmentVMGetAudioDeviceList(d)
 	if err != nil {
@@ -1923,7 +1926,6 @@ func resourceVirtualEnvironmentVMCreateCustom(ctx context.Context, d *schema.Res
 			TrimClonedDisks: &agentTrim,
 			Type:            &agentType,
 		},
-		Args:            &args,
 		AudioDevices:    audioDevices,
 		BIOS:            &bios,
 		BootDisk:        &bootDisk,
@@ -1951,6 +1953,11 @@ func resourceVirtualEnvironmentVMCreateCustom(ctx context.Context, d *schema.Res
 		Template:            &template,
 		VGADevice:           vgaDevice,
 		VMID:                &vmID,
+	}
+
+	if len(args) > 0 {
+		argsString := resourceVirtualEnvironmentVMGetArgsString(d)
+		createBody.Args = &argsString
 	}
 
 	if sataDeviceObjects != nil {
@@ -2571,6 +2578,18 @@ func resourceVirtualEnvironmentVMGetSerialDeviceList(d *schema.ResourceData) (pr
 	return list, nil
 }
 
+func resourceVirtualEnvironmentVMGetArgsString(d *schema.ResourceData) string {
+	args := d.Get(mkResourceVirtualEnvironmentVMArgs).([]interface{})
+	var sanitizedArgs []string
+	for i := 0; i < len(args); i++ {
+		arg := strings.TrimSpace(args[i].(string))
+		if len(arg) > 0 {
+			sanitizedArgs = append(sanitizedArgs, arg)
+		}
+	}
+	return strings.Join(sanitizedArgs, " ")
+}
+
 func resourceVirtualEnvironmentVMGetTagsString(d *schema.ResourceData) string {
 	tags := d.Get(mkResourceVirtualEnvironmentVMTags).([]interface{})
 	var sanitizedTags []string
@@ -2754,7 +2773,7 @@ func resourceVirtualEnvironmentVMReadCustom(ctx context.Context, d *schema.Resou
 	if vmConfig.Args != nil {
 		args[mkResourceVirtualEnvironmentVMArgs] = *vmConfig.Args
 	} else {
-		args[mkResourceVirtualEnvironmentVMArgs] = ""
+		args[mkResourceVirtualEnvironmentVMArgs] = []string{}
 	}
 
 
@@ -3594,18 +3613,21 @@ func resourceVirtualEnvironmentVMReadPrimitiveValues(d *schema.ResourceData, vmC
 		diags = append(diags, diag.FromErr(err)...)
 	}
 
-	currentArgs := d.Get(mkResourceVirtualEnvironmentVMArgs).(string)
+	currentArgs := d.Get(mkResourceVirtualEnvironmentVMArgs).([]interface{})
 
-	if len(clone) == 0 || currentArgs != dvResourceVirtualEnvironmentVMArgs {
+	if len(clone) == 0 || len(currentArgs) > 0 {
+		var args []string
 		if vmConfig.Args != nil {
-			err = d.Set(mkResourceVirtualEnvironmentVMArgs, *vmConfig.Args)
-		} else {
-			// Default value of "args" is "" according to the API documentation.
-			err = d.Set(mkResourceVirtualEnvironmentVMArgs, "")
+			for _, arg := range strings.Split(*vmConfig.Args, " -") {
+				t := strings.TrimSpace(arg)
+				if len(t) > 0 {
+					args = append(args, "-" + t)
+				}
+			}
 		}
+		err = d.Set(mkResourceVirtualEnvironmentVMArgs, args)
 		diags = append(diags, diag.FromErr(err)...)
 	}
-
 
 	currentBIOS := d.Get(mkResourceVirtualEnvironmentVMBIOS).(string)
 
@@ -3766,8 +3788,8 @@ func resourceVirtualEnvironmentVMUpdate(ctx context.Context, d *schema.ResourceD
 	}
 
 	if d.HasChange(mkResourceVirtualEnvironmentVMArgs) {
-		args := d.Get(mkResourceVirtualEnvironmentVMArgs).(string)
-		updateBody.Args = &args
+		argsString := resourceVirtualEnvironmentVMGetArgsString(d)
+		updateBody.Args = &argsString
 		rebootRequired = true
 	}
 
