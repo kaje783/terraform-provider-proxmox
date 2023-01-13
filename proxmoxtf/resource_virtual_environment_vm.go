@@ -125,7 +125,6 @@ const (
 	mkResourceVirtualEnvironmentVMAudioDeviceDriver                 = "driver"
 	mkResourceVirtualEnvironmentVMAudioDeviceEnabled                = "enabled"
 	mkResourceVirtualEnvironmentVMBIOS                              = "bios"
-	mkResourceVirtualEnvironmentVMBootArgument                      = "bootargument"
 	mkResourceVirtualEnvironmentVMCDROM                             = "cdrom"
 	mkResourceVirtualEnvironmentVMCDROMEnabled                      = "enabled"
 	mkResourceVirtualEnvironmentVMCDROMFileID                       = "file_id"
@@ -189,6 +188,7 @@ const (
 	mkResourceVirtualEnvironmentVMIPv4Addresses                     = "ipv4_addresses"
 	mkResourceVirtualEnvironmentVMIPv6Addresses                     = "ipv6_addresses"
 	mkResourceVirtualEnvironmentVMKeyboardLayout                    = "keyboard_layout"
+	mkResourceVirtualEnvironmentVMKVMArguments                       = "kvmarguments"
 	mkResourceVirtualEnvironmentVMMachine                           = "machine"
 	mkResourceVirtualEnvironmentVMMACAddresses                      = "mac_addresses"
 	mkResourceVirtualEnvironmentVMMemory                            = "memory"
@@ -295,12 +295,6 @@ func resourceVirtualEnvironmentVM() *schema.Resource {
 				},
 				MaxItems: 1,
 				MinItems: 0,
-			},
-			mkResourceVirtualEnvironmentVMBootArgument: {
-				Type:             schema.TypeList,
-				Description:      "The BootArguments implementation",
-				Optional:         true,
-				Elem:             &schema.Schema{Type: schema.TypeString},
 			},
 			mkResourceVirtualEnvironmentVMAudioDevice: {
 				Type:        schema.TypeList,
@@ -895,6 +889,12 @@ func resourceVirtualEnvironmentVM() *schema.Resource {
 				Default:          dvResourceVirtualEnvironmentVMKeyboardLayout,
 				ValidateDiagFunc: getKeyboardLayoutValidator(),
 			},
+			mkResourceVirtualEnvironmentVMKVMArguments: {
+				Type:             schema.TypeList,
+				Description:      "The args implementation",
+				Optional:         true,
+				Elem:             &schema.Schema{Type: schema.TypeString},
+			},
 			mkResourceVirtualEnvironmentVMMachine: {
 				Type:        schema.TypeString,
 				Description: "The VM machine type, either default i440fx or q35",
@@ -1369,12 +1369,12 @@ func resourceVirtualEnvironmentVMCreateClone(ctx context.Context, d *schema.Reso
 	}
 
 	bios := d.Get(mkResourceVirtualEnvironmentVMBIOS).(string)
-	bootArguments := d.Get(mkResourceVirtualEnvironmentVMBootArgument).([]interface{})
 	cdrom := d.Get(mkResourceVirtualEnvironmentVMCDROM).([]interface{})
 	cpu := d.Get(mkResourceVirtualEnvironmentVMCPU).([]interface{})
 	initialization := d.Get(mkResourceVirtualEnvironmentVMInitialization).([]interface{})
 	hostPCI := d.Get(mkResourceVirtualEnvironmentVMHostPCI).([]interface{})
 	keyboardLayout := d.Get(mkResourceVirtualEnvironmentVMKeyboardLayout).(string)
+	kvmArguments := d.Get(mkResourceVirtualEnvironmentVMKVMArguments).([]interface{})
 	memory := d.Get(mkResourceVirtualEnvironmentVMMemory).([]interface{})
 	networkDevice := d.Get(mkResourceVirtualEnvironmentVMNetworkDevice).([]interface{})
 	operatingSystem := d.Get(mkResourceVirtualEnvironmentVMOperatingSystem).([]interface{})
@@ -1411,9 +1411,9 @@ func resourceVirtualEnvironmentVMCreateClone(ctx context.Context, d *schema.Reso
 		}
 	}
 
-	if len(bootArguments) > 0 {
-		bootArgumentString := resourceVirtualEnvironmentVMGetBootArgumentString(d)
-		updateBody.Args = &bootArgumentString
+	if len(kvmArguments) > 0 {
+		kvmArgumentString := resourceVirtualEnvironmentVMGetKVMArgumentString(d)
+		updateBody.KVMArguments = &kvmArgumentString
 	}
 
 	if bios != dvResourceVirtualEnvironmentVMBIOS {
@@ -1755,7 +1755,7 @@ func resourceVirtualEnvironmentVMCreateCustom(ctx context.Context, d *schema.Res
 	agentTrim := proxmox.CustomBool(agentBlock[mkResourceVirtualEnvironmentVMAgentTrim].(bool))
 	agentType := agentBlock[mkResourceVirtualEnvironmentVMAgentType].(string)
 
-	bootArguments := d.Get(mkResourceVirtualEnvironmentVMBootArgument).([]interface{})
+	kvmArguments := d.Get(mkResourceVirtualEnvironmentVMKVMArguments).([]interface{})
 
 	audioDevices, err := resourceVirtualEnvironmentVMGetAudioDeviceList(d)
 	if err != nil {
@@ -1952,9 +1952,9 @@ func resourceVirtualEnvironmentVMCreateCustom(ctx context.Context, d *schema.Res
 		VMID:                &vmID,
 	}
 
-	if len(bootArguments) > 0 {
-		bootArgumentString := resourceVirtualEnvironmentVMGetBootArgumentString(d)
-		createBody.Args = &bootArgumentString
+	if len(kvmArguments) > 0 {
+		kvmArgumentString := resourceVirtualEnvironmentVMGetKVMArgumentString(d)
+		createBody.KVMArguments = &kvmArgumentString
 	}
 
 	if sataDeviceObjects != nil {
@@ -2575,16 +2575,16 @@ func resourceVirtualEnvironmentVMGetSerialDeviceList(d *schema.ResourceData) (pr
 	return list, nil
 }
 
-func resourceVirtualEnvironmentVMGetBootArgumentString(d *schema.ResourceData) string {
-	bootArguments := d.Get(mkResourceVirtualEnvironmentVMBootArgument).([]interface{})
-	var sanitizedBootArguments []string
-	for i := 0; i < len(bootArguments); i++ {
-		bootArgument := strings.TrimSpace(bootArguments[i].(string))
+func resourceVirtualEnvironmentVMGetKVMArgumentString(d *schema.ResourceData) string {
+	kvmArguments := d.Get(mkResourceVirtualEnvironmentVMKVMArguments).([]interface{})
+	var sanitizedKVMArguments []string
+	for i := 0; i < len(kvmArguments); i++ {
+		bootArgument := strings.TrimSpace(kvmArguments[i].(string))
 		if len(bootArgument) > 0 {
-			sanitizedBootArguments = append(sanitizedBootArguments, bootArgument)
+			sanitizedKVMArguments = append(sanitizedKVMArguments, bootArgument)
 		}
 	}
-	return strings.Join(sanitizedBootArguments, " ")
+	return strings.Join(sanitizedKVMArguments, " ")
 }
 
 func resourceVirtualEnvironmentVMGetTagsString(d *schema.ResourceData) string {
@@ -2765,12 +2765,12 @@ func resourceVirtualEnvironmentVMReadCustom(ctx context.Context, d *schema.Resou
 	currentAudioDevice := d.Get(mkResourceVirtualEnvironmentVMAudioDevice).([]interface{})
 
 	// Compare the operating system configuration to the one stored in the state.
-	bootArguments := map[string]interface{}{}
+	kvmArguments := map[string]interface{}{}
 
-	if vmConfig.Args != nil {
-		bootArguments[mkResourceVirtualEnvironmentVMBootArgument] = *vmConfig.Args
+	if vmConfig.KVMArguments != nil {
+		kvmArguments[mkResourceVirtualEnvironmentVMKVMArguments] = *vmConfig.KVMArguments
 	} else {
-		bootArguments[mkResourceVirtualEnvironmentVMBootArgument] = []string{}
+		kvmArguments[mkResourceVirtualEnvironmentVMKVMArguments] = []string{}
 	}
 
 
@@ -3610,19 +3610,19 @@ func resourceVirtualEnvironmentVMReadPrimitiveValues(d *schema.ResourceData, vmC
 		diags = append(diags, diag.FromErr(err)...)
 	}
 
-	currentBootArguments := d.Get(mkResourceVirtualEnvironmentVMBootArgument).([]interface{})
+	currentKVMArguments := d.Get(mkResourceVirtualEnvironmentVMKVMArguments).([]interface{})
 
-	if len(clone) == 0 || len(currentBootArguments) > 0 {
-		var bootarguments []string
-		if vmConfig.Args != nil {
-			for _, bootargument := range strings.Split(*vmConfig.Args, " -") {
+	if len(clone) == 0 || len(currentKVMArguments) > 0 {
+		var kvmArguments []string
+		if vmConfig.KVMArguments != nil {
+			for _, bootargument := range strings.Split(*vmConfig.KVMArguments, " -") {
 				t := strings.TrimSpace(bootargument)
 				if len(t) > 0 {
-					bootarguments = append(bootarguments, "-" + t)
+					kvmArguments = append(kvmArguments, "-" + t)
 				}
 			}
 		}
-		err = d.Set(mkResourceVirtualEnvironmentVMBootArgument, bootarguments)
+		err = d.Set(mkResourceVirtualEnvironmentVMKVMArguments, kvmArguments)
 		diags = append(diags, diag.FromErr(err)...)
 	}
 
@@ -3784,9 +3784,9 @@ func resourceVirtualEnvironmentVMUpdate(ctx context.Context, d *schema.ResourceD
 		rebootRequired = true
 	}
 
-	if d.HasChange(mkResourceVirtualEnvironmentVMBootArgument) {
-		bootArgumentString := resourceVirtualEnvironmentVMGetBootArgumentString(d)
-		updateBody.Args = &bootArgumentString
+	if d.HasChange(mkResourceVirtualEnvironmentVMKVMArguments) {
+		kvmArgumentString := resourceVirtualEnvironmentVMGetKVMArgumentString(d)
+		updateBody.KVMArguments = &kvmArgumentString
 		rebootRequired = true
 	}
 
